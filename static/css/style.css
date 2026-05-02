@@ -1,0 +1,318 @@
+:root {
+    --bg-color: #121212;
+    --panel-bg: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --accent-primary: #ff007f; /* Vibrant Pink */
+    --accent-secondary: #fff000; /* Cyber Yellow */
+    --border-width: 3px;
+    --glass-bg: rgba(255, 255, 255, 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* Glassmorphism Utility */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Top Bar */
+.top-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    z-index: 1000;
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: var(--border-width) solid var(--text-primary);
+}
+
+.logo {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+.logo span {
+    color: var(--accent-primary);
+}
+
+.selectors {
+    display: flex;
+    gap: 20px;
+}
+
+.select-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+select {
+    background: var(--bg-color);
+    color: var(--text-primary);
+    border: var(--border-width) solid var(--text-primary);
+    padding: 8px 16px;
+    font-weight: 700;
+    cursor: pointer;
+    outline: none;
+    transition: transform 0.1s;
+}
+
+.mini-add-btn, .mini-del-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    background: var(--bg-color);
+    border: 2px solid var(--text-primary);
+    cursor: pointer;
+}
+
+.mini-add-btn { color: var(--accent-secondary); }
+.mini-del-btn { color: #ff4444; }
+
+.mini-add-btn:hover, .mini-del-btn:hover {
+    background: var(--text-primary);
+    color: var(--bg-color);
+}
+
+/* Main Container */
+.main-container {
+    display: flex;
+    height: calc(100vh - 70px);
+    margin-top: 70px;
+}
+
+.panel-title {
+    font-size: 20px;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    border-bottom: var(--border-width) solid var(--accent-primary);
+    display: inline-block;
+}
+
+/* Left Panel (Syllabus) */
+.left-panel {
+    width: 380px;
+    border-right: var(--border-width) solid var(--text-primary);
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.chapter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.chapter-item:hover {
+    background: var(--glass-bg);
+    border-color: var(--accent-secondary);
+}
+
+.chapter-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed var(--text-secondary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    flex-grow: 1;
+    outline: none;
+}
+
+.manage-q-btn {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.del-ch-btn {
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+/* Right Panel (Paper Style) */
+.right-panel {
+    flex-grow: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.global-settings {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 20px;
+    margin-bottom: 30px;
+    border: 2px solid var(--accent-primary);
+}
+
+.global-settings .input-group label {
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--accent-secondary);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.global-settings .input-group input {
+    width: 100%;
+    background: var(--bg-color);
+    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+    padding: 8px;
+    font-weight: 600;
+}
+
+.sections-container {
+    max-width: 1000px;
+}
+
+.section-wrapper {
+    background: var(--panel-bg);
+    border: var(--border-width) solid var(--text-primary);
+    margin-bottom: 30px;
+    box-shadow: 10px 10px 0px var(--accent-primary);
+}
+
+.section-header {
+    background: var(--text-primary);
+    color: var(--bg-color);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-header h3 { font-weight: 900; text-transform: uppercase; }
+
+.blocks-container { padding: 20px; }
+
+.rule-block {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--text-secondary);
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.block-controls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.chapter-selector-mini {
+    border: 1px solid var(--text-secondary);
+    padding: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--bg-color);
+}
+
+.chapter-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2000;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal-content.glass {
+    max-width: 900px; width: 95%; max-height: 90vh;
+    overflow-y: auto; padding: 40px; border: var(--border-width) solid var(--accent-secondary);
+}
+
+.add-q-section {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 20px; border: 1px solid var(--accent-primary); margin-bottom: 30px;
+}
+
+.add-q-form { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: end; }
+.add-q-form textarea { background: var(--bg-color); color: var(--text-primary); border: 2px solid var(--text-primary); padding: 10px; height: 45px; resize: none; }
+
+.managed-q-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px; background: rgba(255, 255, 255, 0.03); border-left: 5px solid var(--accent-primary); margin-bottom: 10px;
+}
+
+.delete-q-btn { background: #ff4444; color: white; border: none; padding: 6px 12px; cursor: pointer; }
+
+/* Preview */
+.preview-panel { margin-top: 50px; padding-bottom: 50px; }
+.panel-header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.generation-settings { display: flex; align-items: center; gap: 15px; }
+
+.paper-content {
+    padding: 50px; border: var(--border-width) solid var(--text-primary);
+    background: #fff; color: #000; font-family: serif;
+}
+
+.paper-section-title { font-weight: 900; font-size: 1.5rem; border-bottom: 3px solid #000; margin-top: 30px; margin-bottom: 15px; }
+.paper-block-instr { font-style: italic; margin-bottom: 10px; font-weight: bold; }
+.question-item { margin-bottom: 15px; display: flex; justify-content: space-between; font-size: 1.1rem; }
+
+/* General UI */
+.input-group { display: flex; flex-direction: column; gap: 5px; }
+.input-group label { font-size: 11px; font-weight: 900; color: var(--text-secondary); text-transform: uppercase; }
+
+button { font-weight: 900; text-transform: uppercase; cursor: pointer; border: var(--border-width) solid var(--text-primary); transition: all 0.1s; }
+.primary-btn { background: var(--accent-primary); color: white; padding: 10px 24px; }
+.primary-btn:hover { transform: translate(-3px, -3px); box-shadow: 6px 6px 0px white; }
+.secondary-btn { background: var(--accent-secondary); color: black; padding: 8px 18px; }
+
+.hidden { display: none !important; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-color); }
+::-webkit-scrollbar-thumb { background: var(--accent-primary); }

@@ -1,29 +1,24 @@
 import random
+import os
+from docx import Document
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from database.db_manager import DatabaseManager
 
 class InsufficientQuestionsError(Exception):
     """Custom exception raised when a chapter lacks enough questions of a specific type."""
-    def __init__(self, chapter_name, type_name, required, available):
-        self.message = f"Chapter '{chapter_name}' has insufficient '{type_name}' questions. Required: {required}, Available: {available}."
+    def __init__(self, section_name, block_index, type_name, required, available):
+        self.message = f"[{section_name} - Block {block_index + 1}] Insufficient '{type_name}' questions. Required: {required}, Available (unused): {available}."
         super().__init__(self.message)
 
 class PaperGenerator:
     """
-    Core engine for generating question papers based on templates and weights.
-    Ensures fair distribution across chapters and supports seeded randomization.
+    Advanced engine for generating question papers with granular section blocks
+    and global uniqueness tracking.
     """
 
     def __init__(self):
         self.db = DatabaseManager()
-
-    def _get_chapter_name(self, chapter_id):
-        """Helper to get chapter name for error messages."""
-        conn = self.db._get_connection()
-        try:
-            row = conn.execute("SELECT name FROM chapters WHERE id = ?", (chapter_id,)).fetchone()
-            return row['name'] if row else f"ID: {chapter_id}"
-        finally:
-            conn.close()
 
     def _get_type_name(self, type_id):
         """Helper to get question type name for error messages."""
@@ -34,14 +29,12 @@ class PaperGenerator:
         finally:
             conn.close()
 
-    def generate_paper(self, selected_chapters, template_rules, seed, manual_questions=None):
+    def generate_paper(self, nested_sections, seed):
         """
         Generates a full question paper structure.
         
-        :param selected_chapters: List of chapter IDs to pull questions from.
-        :param template_rules: List of section rules: [{'section_name': 'A', 'type_id': 1, 'count': 5, 'marks': 1}, ...]
+        :param nested_sections: List of sections: [{"name": "A", "blocks": [...]}, ...]
         :param seed: Integer seed for reproducible randomization.
-        :param manual_questions: List of pre-selected question IDs (not implemented in this turn's logic but reserved).
         :return: Dictionary representing the paper.
         """
         random.seed(seed)
@@ -49,70 +42,124 @@ class PaperGenerator:
             "seed": seed,
             "sections": {}
         }
-
-        # Reserve manual questions (if any)
-        # For this version, we assume manual_questions are already categorized by section.
-        # But per requirements, we'll focus on the random engine logic first.
         
-        for rule in template_rules:
-            section_name = rule['section_name']
-            type_id = rule['type_id']
-            total_required = rule['count']
-            
-            # 1. Weightage Logic: Divide total count by number of chapters
-            num_chapters = len(selected_chapters)
-            base_count = total_required // num_chapters
-            remainder = total_required % num_chapters
-            
-            # 2. Remainder Handling: Randomly pick chapters to get the extra questions
-            # Using the seed ensures this choice is reproducible
-            extra_chapters = random.sample(selected_chapters, remainder)
-            
-            section_questions = []
-            
-            for ch_id in selected_chapters:
-                count_for_this_chapter = base_count + (1 if ch_id in extra_chapters else 0)
-                
-                if count_for_this_chapter == 0:
-                    continue
+        used_question_ids = set()
 
-                # 3. Validation: Check availability
-                available_count = self.db.check_question_availability([ch_id], type_id)
-                if available_count < count_for_this_chapter:
-                    ch_name = self._get_chapter_name(ch_id)
-                    type_name = self._get_type_name(type_id)
-                    raise InsufficientQuestionsError(ch_name, type_name, count_for_this_chapter, available_count)
-                
-                # 4. Fetch Questions
-                conn = self.db._get_connection()
-                try:
-                    query = "SELECT * FROM questions WHERE chapter_id = ? AND type_id = ?"
-                    cursor = conn.execute(query, (ch_id, type_id))
-                    all_questions = [dict(row) for row in cursor.fetchall()]
-                    
-                    # Randomly pick from available pool using the seed
-                    selected = random.sample(all_questions, count_for_this_chapter)
-                    section_questions.extend(selected)
-                finally:
-                    conn.close()
-
-            # Shuffle the section questions to mix chapters together
-            random.shuffle(section_questions)
-            
+        for section in nested_sections:
+            section_name = section['name']
             paper["sections"][section_name] = {
-                "rule": rule,
-                "questions": section_questions
+                "blocks": []
             }
+            
+            for idx, block in enumerate(section['blocks']):
+                type_id = block['type_id']
+                target_chapters = block['chapters']
+                total_required = block['count']
+                marks_per_q = block['marks']
+                
+                # 1. Validation: Check overall availability for this block excluding used_ids
+                available_count = self.db.check_question_availability_v2(target_chapters, type_id, list(used_question_ids))
+                if available_count < total_required:
+                    type_name = self._get_type_name(type_id)
+                    raise InsufficientQuestionsError(section_name, idx, type_name, total_required, available_count)
+                
+                # 2. Weightage Logic: Divide total count by number of chapters
+                num_chapters = len(target_chapters)
+                if num_chapters == 0:
+                    raise Exception(f"[{section_name}] Block {idx + 1} has no chapters selected.")
+
+                base_count = total_required // num_chapters
+                remainder = total_required % num_chapters
+                extra_chapters = random.sample(target_chapters, remainder)
+                
+                block_questions = []
+                
+                for ch_id in target_chapters:
+                    count_for_this_chapter = base_count + (1 if ch_id in extra_chapters else 0)
+                    if count_for_this_chapter == 0:
+                        continue
+                        
+                    # 3. Fetch Questions (ensuring no duplicates from previous blocks)
+                    questions = self.db.get_random_questions(ch_id, type_id, count_for_this_chapter, list(used_question_ids))
+                    
+                    if questions is None:
+                        # This shouldn't happen due to check_question_availability_v2, but safety first
+                        type_name = self._get_type_name(type_id)
+                        raise Exception(f"Internal error: Could not fetch questions for chapter {ch_id} (Type: {type_name})")
+
+                    # Update used_ids
+                    for q in questions:
+                        used_question_ids.add(q['id'])
+                    
+                    block_questions.extend(questions)
+
+                # Shuffle to mix chapters within the block
+                random.shuffle(block_questions)
+                
+                paper["sections"][section_name]["blocks"].append({
+                    "rule": block,
+                    "questions": block_questions
+                })
 
         return paper
 
+class DocxExporter:
+    """
+    Handles the generation of Microsoft Word documents from nested paper JSON.
+    """
+    
+    @staticmethod
+    def generate_docx(paper_data, output_path):
+        """
+        Creates a .docx file from the nested paper structure.
+        """
+        doc = Document()
+        
+        # Meta Settings from Payload or Defaults
+        meta = paper_data.get('meta', {})
+        inst_name = meta.get('institution', 'ACADEMIC INSTITUTION')
+        exam_name = meta.get('exam_name', 'ANNUAL EXAMINATION')
+        time_limit = meta.get('time_limit', '3 Hours')
+        
+        # 1. Professional Header
+        doc.add_heading(inst_name, 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_heading(exam_name, 1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Total Marks calculation
+        total_marks = 0
+        for section in paper_data['sections'].values():
+            for block in section['blocks']:
+                total_marks += block['rule']['count'] * block['rule']['marks']
+        
+        # Metadata Table
+        table = doc.add_table(rows=1, cols=2)
+        cells = table.rows[0].cells
+        cells[0].text = f"Total Marks: {total_marks}"
+        cells[1].text = f"Time: {time_limit}"
+        
+        # Add a border line
+        doc.add_paragraph("_" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Sections
+        for section_name, section_data in paper_data['sections'].items():
+            sec_title = doc.add_heading(section_name, level=2)
+            sec_title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            
+            q_counter = 1
+            for block in section_data['blocks']:
+                rule = block['rule']
+                instr = doc.add_paragraph(f"Answer the following ({rule['count']} x {rule['marks']} = {rule['count'] * rule['marks']} Marks)")
+                instr.italic = True
+                
+                for q in block['questions']:
+                    p = doc.add_paragraph()
+                    p.add_run(f"{q_counter}. ").bold = True
+                    p.add_run(q['content'])
+                    p.add_run(f" \t[{q['marks']}]").bold = True
+                    q_counter += 1
+
+        doc.save(output_path)
+        return output_path
+
 if __name__ == "__main__":
-    # Small test if run directly
-    gen = PaperGenerator()
-    try:
-        # Assuming chapter IDs 1, 2, 3 and type_id 1 (MCQ) exist from seeder
-        test_rules = [{'section_name': 'Section A', 'type_id': 1, 'count': 5, 'marks': 1}]
-        paper = gen.generate_paper([1, 2, 3], test_rules, 42)
-        print("Paper generated successfully with", len(paper['sections']['Section A']['questions']), "questions.")
-    except Exception as e:
-        print(f"Test failed: {e}")
+    print("Generator service updated for nested logic.")

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Paper Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="logo">PAPER<span>GEN</span></div>
+        <div class="selectors">
+            <div class="select-wrapper">
+                <select id="standard-select">
+                    <option value="">Select Standard</option>
+                </select>
+                <button id="add-std-btn" class="mini-add-btn" title="Add Standard">+</button>
+                <button id="del-std-btn" class="mini-del-btn" title="Delete Selected Standard">&times;</button>
+            </div>
+            <div class="select-wrapper">
+                <select id="subject-select" disabled>
+                    <option value="">Select Subject</option>
+                </select>
+                <button id="add-sub-btn" class="mini-add-btn" title="Add Subject">+</button>
+                <button id="del-sub-btn" class="mini-del-btn" title="Delete Selected Subject">&times;</button>
+            </div>
+        </div>
+        <div class="actions">
+            <button id="generate-btn" class="primary-btn">GENERATE PAPER</button>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <aside class="left-panel">
+            <h2 class="panel-title">Syllabus Reference</h2>
+            <div id="chapter-list" class="scrollable-content">
+                <p class="empty-state">Select a subject to view chapters.</p>
+            </div>
+            <button id="add-chapter-btn" class="secondary-btn add-item-btn hidden">+ Add New Chapter</button>
+        </aside>
+
+        <section class="right-panel">
+            <div class="panel-header-actions" style="margin-bottom:10px">
+                <h2 class="panel-title">Paper Structure & Templates</h2>
+                <div class="template-controls">
+                    <select id="template-select">
+                        <option value="">Load Template...</option>
+                    </select>
+                    <button id="save-template-btn" class="secondary-btn" style="padding:4px 12px; font-size:12px">Save As Template</button>
+                </div>
+            </div>
+            
+            <div class="global-settings glass">
+                <div class="input-group">
+                    <label>Institution Name</label>
+                    <input type="text" id="inst-name" placeholder="e.g. St. Xavier's School">
+                </div>
+                <div class="input-group">
+                    <label>Exam Name</label>
+                    <input type="text" id="exam-name" placeholder="e.g. Mid-Term 2026">
+                </div>
+                <div class="input-group">
+                    <label>Time Allowed</label>
+                    <input type="text" id="time-limit" value="3 Hours">
+                </div>
+            </div>
+
+            <div id="sections-container" class="sections-container">
+                <!-- Managed by JS -->
+            </div>
+            <button id="add-section-btn" class="secondary-btn">+ Add Section</button>
+
+            <div id="preview-panel" class="preview-panel hidden">
+                <div class="panel-header-actions">
+                    <h2 class="panel-title">Live Preview</h2>
+                    <div class="generation-settings">
+                        <label>Seed:</label>
+                        <input type="number" id="paper-seed" value="42" style="width: 70px;">
+                        <button id="export-docx-btn" class="secondary-btn">Export to Word (.docx)</button>
+                    </div>
+                </div>
+                <div id="paper-content" class="paper-content glass">
+                    <!-- Generated paper structure -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="modal-title">Chapter Details</h3>
+                <button id="close-modal" class="close-btn">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

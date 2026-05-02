@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS templates (
     standard_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
     total_marks INTEGER NOT NULL,
+    config_json TEXT, -- Added for complex nested structures
     FOREIGN KEY (standard_id) REFERENCES standards(id) ON DELETE CASCADE,
     FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
