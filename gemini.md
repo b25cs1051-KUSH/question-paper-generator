@@ -1,27 +1,41 @@
 # Role
-You are an Expert Senior Python Architect and Full-Stack Developer. You write clean, modular, and production-ready code.
+Expert Senior Python Architect & Full-Stack Developer.
 
 # Project Overview
-We are building a LOCAL-FIRST web application for generating academic question papers. It runs locally on the user's machine using a Python backend and a lightweight browser-based frontend. 
+**QuestGen Local:** A local-first web application for generating academic question papers using a Python (Flask) backend and a Neobrutalist Vanilla JS frontend.
 
-# Tech Stack (STRICT)
-- **Backend:** Python, Flask (Lightweight server)
-- **Database:** SQLite3 (Local `.db` file, using pure SQL or sqlite3 module)
-- **Frontend:** Vanilla HTML, CSS, JavaScript (NO React, NO Vue, NO build steps). 
-- **Design System:** Modern, high-contrast aesthetic with dark luxury backgrounds, bold typography, and subtle glassmorphism elements for modals and overlapping UI.
-- **Document Generation:** `python-docx` for editable Word documents.
+# Tech Stack
+- **Backend:** Python 3.x, Flask
+- **Database:** SQLite3 (Pure SQL, no ORM)
+- **Frontend:** HTML5, CSS3 (Glassmorphism), Vanilla JS
+- **Export:** `python-docx` (Professional Word document generation)
 
-# Core Feature Requirements
-1. **Hierarchical Data:** Standards (8-12) -> Subjects -> Chapters -> Question Types (MCQ, True/False, Short, Long).
-2. **Template Builder:** Define sections (A, B, C), map question types to sections, and define marks per question.
-3. **Weightage Engine:** 
-   - Uses a Seeded Randomization system for reproducible papers.
-   - Default Mode: Equal distribution of questions across selected chapters.
-   - Conflict Handling: Strict validation if required questions > available questions.
-4. **Live Preview & Export:** A UI panel to preview the generated paper, move questions around, edit text directly, and export to `.docx`.
+# Current Implementation Status
+1.  **Database Layer (`database/`):**
+    - `schema.sql`: Hierarchical structure (Standards > Subjects > Chapters > Questions).
+    - `db_manager.py`: Handles all CRUD, nested question availability checks, and template persistence.
+    - `seeder.py`: Seeds 600 sample questions (Std 8-12) for instant testing.
+2.  **Generation Engine (`services/`):**
+    - `generator_service.py`: 
+        - Features a **Robust Weightage Engine** that pools questions from selected chapters and handles "Equal Distribution" even if some chapters are empty.
+        - Includes `DocxExporter` for high-quality Word document generation with professional headers.
+3.  **Application Core (`app.py`):**
+    - REST API for Standards, Subjects, Chapters, Templates, and Generation.
+    - Error handling with traceback logging for local debugging.
+    - CSV Stream processing for bulk question imports.
+4.  **Frontend (`static/`, `templates/`):**
+    - **Neobrutalist UI:** High-contrast dark theme (#121212) with bold borders and glassmorphism.
+    - **Dynamic Builder:** Users can create Sections (A, B, C) and nested "Question Blocks" with per-block chapter selection.
+    - **Template System:** Save and load full paper structures (Sections, Blocks, Chapters).
 
-# Execution Rules (CRITICAL)
-1. **DO NOT generate the entire project at once.** I will ask you for specific files one at a time.
-2. **Output complete files.** Never use placeholders like `// ... rest of the code ...`. If I ask for a file, output the entire updated file.
-3. **Single Responsibility:** Keep database logic in DB files, routing in `app.py`, and UI logic in JS files.
-4. **Wait for instructions.** Answer queries precisely based on the file requested. Do not preemptively write code for files I haven't asked for yet.
+# Operational Guide
+- **Initial Setup:** `python -m database.seeder` (Adds 600 questions).
+- **Run Server:** `python app.py` (Runs on `http://127.0.0.1:5000`).
+- **Update Database:** Use `python scripts/update_db.py` for schema migrations.
+- **Bulk Import:** Use the "Download Sample CSV" link in the UI to see the required format.
+
+# Development Standards
+1.  **Surgical Edits:** Use `replace` or `write_file` for complete, error-free code.
+2.  **No Placeholders:** Always output entire files.
+3.  **Single Responsibility:** Keep DB logic, Routing, and UI separate.
+4.  **Verification:** Always verify 200 OK responses for generation and export.

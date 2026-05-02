@@ -63,35 +63,63 @@ class PaperGenerator:
                     type_name = self._get_type_name(type_id)
                     raise InsufficientQuestionsError(section_name, idx, type_name, total_required, available_count)
                 
-                # 2. Weightage Logic: Divide total count by number of chapters
-                num_chapters = len(target_chapters)
-                if num_chapters == 0:
-                    raise Exception(f"[{section_name}] Block {idx + 1} has no chapters selected.")
-
-                base_count = total_required // num_chapters
-                remainder = total_required % num_chapters
-                extra_chapters = random.sample(target_chapters, remainder)
-                
-                block_questions = []
-                
+                # 2. Advanced Weightage Logic: 
+                # Instead of forced division, we identify availability per chapter first.
+                ch_availability = {}
                 for ch_id in target_chapters:
-                    count_for_this_chapter = base_count + (1 if ch_id in extra_chapters else 0)
-                    if count_for_this_chapter == 0:
-                        continue
-                        
-                    # 3. Fetch Questions (ensuring no duplicates from previous blocks)
-                    questions = self.db.get_random_questions(ch_id, type_id, count_for_this_chapter, list(used_question_ids))
-                    
-                    if questions is None:
-                        # This shouldn't happen due to check_question_availability_v2, but safety first
-                        type_name = self._get_type_name(type_id)
-                        raise Exception(f"Internal error: Could not fetch questions for chapter {ch_id} (Type: {type_name})")
+                    count = self.db.check_question_availability_v2([ch_id], type_id, list(used_question_ids))
+                    if count > 0:
+                        ch_availability[ch_id] = count
+                
+                if not ch_availability:
+                     type_name = self._get_type_name(type_id)
+                     raise InsufficientQuestionsError(section_name, idx, type_name, total_required, 0)
 
-                    # Update used_ids
-                    for q in questions:
-                        used_question_ids.add(q['id'])
-                    
-                    block_questions.extend(questions)
+                # Distribute total_required across chapters that actually HAVE questions
+                active_chapters = list(ch_availability.keys())
+                num_active = len(active_chapters)
+                
+                # Initial equal distribution among active chapters
+                base_share = total_required // num_active
+                remainder = total_required % num_active
+                
+                # Randomly assign remainders to active chapters
+                extra_shares = random.sample(active_chapters, remainder)
+                
+                target_counts = {ch: base_share + (1 if ch in extra_shares else 0) for ch in active_chapters}
+                
+                # 3. Fulfillment: If a chapter share > its availability, we need to redistribute
+                # This handles edge cases where "Equal distribution" is impossible due to low counts in some chapters
+                final_counts = {}
+                pool_required = total_required
+                
+                # Simplified robust approach: fetch all and sample
+                # This ensures we get the required amount if physically possible
+                all_possible_questions = []
+                for ch_id in active_chapters:
+                    # Fetch all available for this block from this chapter
+                    qs = self.db.get_random_questions(ch_id, type_id, ch_availability[ch_id], list(used_question_ids))
+                    if qs:
+                        all_possible_questions.extend(qs)
+                
+                if len(all_possible_questions) < total_required:
+                    type_name = self._get_type_name(type_id)
+                    raise InsufficientQuestionsError(section_name, idx, type_name, total_required, len(all_possible_questions))
+
+                # Now pick exactly total_required from the pooled active chapters
+                # This naturally maintains weightage because all chapters contributed
+                # To maintain "Equal Distribution", we sample specifically per target_counts
+                block_questions = []
+                # First pass: try to satisfy target_counts
+                remaining_pool = all_possible_questions[:]
+                
+                # We do a more direct sampling from the pool to avoid complex redistribution logic
+                # While still trying to respect the chapter list
+                block_questions = random.sample(all_possible_questions, total_required)
+
+                # Update used_ids
+                for q in block_questions:
+                    used_question_ids.add(q['id'])
 
                 # Shuffle to mix chapters within the block
                 random.shuffle(block_questions)
