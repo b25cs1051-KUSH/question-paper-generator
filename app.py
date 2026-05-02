@@ -175,6 +175,22 @@ def save_template():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/templates/<int:template_id>', methods=['PUT'])
+def update_template(template_id):
+    """Updates a paper template."""
+    data = request.json
+    try:
+        if db.update_template(
+            template_id,
+            data['name'],
+            data['config_json'],
+            data['total_marks']
+        ):
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to update template"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/templates/<int:subject_id>', methods=['GET'])
 def get_templates(subject_id):
     """Returns templates for a subject."""

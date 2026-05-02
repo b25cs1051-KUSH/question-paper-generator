@@ -89,6 +89,56 @@ def seed_database():
         questions_count += 10
 
     print(f"Final Step: Successfully seeded {questions_count} total questions.")
+
+    # 6. Seed Sample Templates
+    print("Step 6: Seeding sample templates...")
+    import json
+    for key, sub_id in subject_map.items():
+        std_id = standard_ids[key[0]]
+        # Get chapter IDs for this subject
+        conn = db._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM chapters WHERE subject_id = ?", (sub_id,))
+        sub_chapters = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        if not sub_chapters: continue
+
+        # Sample Mid-Term Template
+        mid_term_config = [
+            {
+                "name": "Section A",
+                "blocks": [
+                    {"type_id": type_ids["MCQ"], "chapters": sub_chapters, "count": 5, "marks": 1},
+                    {"type_id": type_ids["True/False"], "chapters": sub_chapters, "count": 5, "marks": 1}
+                ]
+            },
+            {
+                "name": "Section B",
+                "blocks": [
+                    {"type_id": type_ids["Short Answer"], "chapters": sub_chapters, "count": 2, "marks": 3}
+                ]
+            }
+        ]
+        db.save_template(std_id, sub_id, "Standard Mid-Term", json.dumps(mid_term_config), 16)
+
+        # Sample Final Exam Template
+        final_config = [
+            {
+                "name": "Section A",
+                "blocks": [{"type_id": type_ids["MCQ"], "chapters": sub_chapters, "count": 10, "marks": 1}]
+            },
+            {
+                "name": "Section B",
+                "blocks": [{"type_id": type_ids["Short Answer"], "chapters": sub_chapters, "count": 5, "marks": 2}]
+            },
+            {
+                "name": "Section C",
+                "blocks": [{"type_id": type_ids["Long Answer"], "chapters": sub_chapters, "count": 4, "marks": 5}]
+            }
+        ]
+        db.save_template(std_id, sub_id, "Final Examination Pattern", json.dumps(final_config), 40)
+
     print("--- Seeding Complete ---")
 
 if __name__ == "__main__":

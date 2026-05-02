@@ -12,19 +12,19 @@
     <header class="top-bar">
         <div class="logo">PAPER<span>GEN</span></div>
         <div class="selectors">
-            <div class="select-wrapper">
-                <select id="standard-select">
+            <div class="select-wrapper glass" style="padding: 2px 10px; border-radius: 8px;">
+                <select id="standard-select" style="border:none; background:transparent">
                     <option value="">Select Standard</option>
                 </select>
-                <button id="add-std-btn" class="mini-add-btn" title="Add Standard">+</button>
-                <button id="del-std-btn" class="mini-del-btn" title="Delete Selected Standard">&times;</button>
+                <button id="add-std-btn" class="mini-add-btn" title="Add Standard" style="border:none; background:transparent">+</button>
+                <button id="del-std-btn" class="mini-del-btn" title="Delete Selected Standard" style="border:none; background:transparent">&times;</button>
             </div>
-            <div class="select-wrapper">
-                <select id="subject-select" disabled>
+            <div class="select-wrapper glass" style="padding: 2px 10px; border-radius: 8px;">
+                <select id="subject-select" disabled style="border:none; background:transparent">
                     <option value="">Select Subject</option>
                 </select>
-                <button id="add-sub-btn" class="mini-add-btn" title="Add Subject">+</button>
-                <button id="del-sub-btn" class="mini-del-btn" title="Delete Selected Subject">&times;</button>
+                <button id="add-sub-btn" class="mini-add-btn" title="Add Subject" style="border:none; background:transparent">+</button>
+                <button id="del-sub-btn" class="mini-del-btn" title="Delete Selected Subject" style="border:none; background:transparent">&times;</button>
             </div>
         </div>
         <div class="actions">
@@ -42,12 +42,13 @@
         </aside>
 
         <section class="right-panel">
-            <div class="panel-header-actions" style="margin-bottom:10px">
-                <h2 class="panel-title">Paper Structure & Templates</h2>
+            <div class="panel-header-actions">
+                <h2 class="panel-title" style="margin-bottom:0; border:none">Paper Structure</h2>
                 <div class="template-controls">
                     <select id="template-select">
                         <option value="">Load Template...</option>
                     </select>
+                    <button id="del-template-btn" class="mini-del-btn" title="Delete Selected Template">&times;</button>
                     <button id="save-template-btn" class="secondary-btn" style="padding:4px 12px; font-size:12px">Save As Template</button>
                 </div>
             </div>

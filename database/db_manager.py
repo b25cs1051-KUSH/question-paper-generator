@@ -228,6 +228,24 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def update_template(self, template_id, name, config_json, total_marks):
+        """Updates an existing template."""
+        query = """
+            UPDATE templates 
+            SET name = ?, config_json = ?, total_marks = ?
+            WHERE id = ?
+        """
+        conn = self._get_connection()
+        try:
+            conn.execute(query, (name, config_json, total_marks, template_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating template: {e}")
+            return False
+        finally:
+            conn.close()
+
     def get_templates(self, subject_id):
         """Retrieves all saved templates for a specific subject."""
         query = "SELECT * FROM templates WHERE subject_id = ? ORDER BY id DESC"
