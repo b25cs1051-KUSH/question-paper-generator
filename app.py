@@ -3,6 +3,7 @@ import os
 import tempfile
 import csv
 import io
+import traceback
 from database.db_manager import DatabaseManager
 from services.generator_service import PaperGenerator, InsufficientQuestionsError, DocxExporter
 
@@ -15,273 +16,164 @@ def index():
     """Serves the main frontend page."""
     return render_template('index.html')
 
+# --- Standards ---
 @app.route('/api/standards', methods=['GET'])
 def get_standards():
-    """Returns all available standards."""
-    try:
-        standards = db.get_standards()
-        return jsonify(standards)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db.get_standards())
 
 @app.route('/api/standards', methods=['POST'])
 def add_standard():
-    """Adds a new standard."""
     data = request.json
     name = data.get('name')
-    if not name:
-        return jsonify({"error": "Name is required"}), 400
-    
-    std_id = db.add_standard(name)
-    if std_id:
-        return jsonify({"success": True, "id": std_id})
-    return jsonify({"error": "Failed to add standard"}), 500
+    if not name: return jsonify({"error": "Name is required"}), 400
+    res = db.add_standard(name)
+    return jsonify({"success": True, "id": res}) if res else jsonify({"error": "Failed"}), 500
 
-@app.route('/api/standards/<int:standard_id>', methods=['DELETE'])
-def delete_standard(standard_id):
-    """Deletes a standard."""
-    if db.delete_standard(standard_id):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to delete standard"}), 500
+@app.route('/api/standards/<int:id>', methods=['DELETE'])
+def delete_standard(id):
+    return jsonify({"success": db.delete_standard(id)})
 
+# --- Subjects ---
 @app.route('/api/subjects/<int:standard_id>', methods=['GET'])
 def get_subjects(standard_id):
-    """Returns subjects for a specific standard."""
-    try:
-        subjects = db.get_subjects(standard_id)
-        return jsonify(subjects)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db.get_subjects(standard_id))
 
 @app.route('/api/subjects', methods=['POST'])
 def add_subject():
-    """Adds a new subject."""
     data = request.json
-    standard_id = data.get('standard_id')
-    name = data.get('name')
-    if not standard_id or not name:
-        return jsonify({"error": "standard_id and name are required"}), 400
-    
-    sub_id = db.add_subject(standard_id, name)
-    if sub_id:
-        return jsonify({"success": True, "id": sub_id})
-    return jsonify({"error": "Failed to add subject"}), 500
+    res = db.add_subject(data.get('standard_id'), data.get('name'))
+    return jsonify({"success": True, "id": res}) if res else jsonify({"error": "Failed"}), 500
 
-@app.route('/api/subjects/<int:subject_id>', methods=['DELETE'])
-def delete_subject(subject_id):
-    """Deletes a subject."""
-    if db.delete_subject(subject_id):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to delete subject"}), 500
+@app.route('/api/subjects/<int:id>', methods=['DELETE'])
+def delete_subject(id):
+    return jsonify({"success": db.delete_subject(id)})
 
+# --- Chapters ---
 @app.route('/api/chapters/<int:subject_id>', methods=['GET'])
 def get_chapters(subject_id):
-    """Returns chapters for a specific subject."""
-    try:
-        chapters = db.get_chapters(subject_id)
-        return jsonify(chapters)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db.get_chapters(subject_id))
 
 @app.route('/api/chapters', methods=['POST'])
 def add_chapter():
-    """Adds a new chapter."""
     data = request.json
-    subject_id = data.get('subject_id')
-    name = data.get('name')
-    if not subject_id or not name:
-        return jsonify({"error": "subject_id and name are required"}), 400
-    
-    ch_id = db.add_chapter(subject_id, name)
-    if ch_id:
-        return jsonify({"success": True, "id": ch_id})
-    return jsonify({"error": "Failed to add chapter"}), 500
+    res = db.add_chapter(data.get('subject_id'), data.get('name'))
+    return jsonify({"success": True, "id": res}) if res else jsonify({"error": "Failed"}), 500
 
-@app.route('/api/chapters/<int:chapter_id>', methods=['PUT'])
-def update_chapter(chapter_id):
-    """Updates chapter name."""
+@app.route('/api/chapters/<int:id>', methods=['PUT'])
+def update_chapter(id):
     data = request.json
-    new_name = data.get('name')
-    if not new_name:
-        return jsonify({"error": "Name is required"}), 400
-    
-    if db.update_chapter_name(chapter_id, new_name):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to update chapter"}), 500
+    return jsonify({"success": db.update_chapter_name(id, data.get('name'))})
 
-@app.route('/api/chapters/<int:chapter_id>', methods=['DELETE'])
-def delete_chapter(chapter_id):
-    """Deletes a chapter."""
-    if db.delete_chapter(chapter_id):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to delete chapter"}), 500
+@app.route('/api/chapters/<int:id>', methods=['DELETE'])
+def delete_chapter(id):
+    return jsonify({"success": db.delete_chapter(id)})
 
+# --- Question Types ---
 @app.route('/api/question_types', methods=['GET'])
 def get_question_types():
-    """Returns all available question types."""
-    try:
-        types = db.get_question_types()
-        return jsonify(types)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db.get_question_types())
 
+# --- Questions ---
 @app.route('/api/questions/chapter/<int:chapter_id>', methods=['GET'])
 def get_chapter_questions(chapter_id):
-    """Returns all questions for a chapter."""
-    try:
-        questions = db.get_questions_for_chapter(chapter_id)
-        return jsonify(questions)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify(db.get_questions_for_chapter(chapter_id))
 
 @app.route('/api/questions', methods=['POST'])
 def add_question():
-    """Adds a new question."""
     data = request.json
     try:
         q_id = db.add_question(
-            data['chapter_id'],
-            data['type_id'],
-            data['content'],
-            data['marks'],
-            data.get('difficulty', 'Medium')
+            data['chapter_id'], data['type_id'], data['content'],
+            data['marks'], data.get('difficulty', 'Medium')
         )
-        if q_id:
-            return jsonify({"success": True, "id": q_id})
-        return jsonify({"error": "Possible duplicate question"}), 400
+        return jsonify({"success": True, "id": q_id}) if q_id else jsonify({"error": "Duplicate"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/questions/<int:question_id>', methods=['DELETE'])
-def delete_question(question_id):
-    """Deletes a question."""
-    if db.delete_question(question_id):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to delete question"}), 500
+@app.route('/api/questions/<int:id>', methods=['DELETE'])
+def delete_question(id):
+    return jsonify({"success": db.delete_question(id)})
 
-@app.route('/api/templates', methods=['POST'])
-def save_template():
-    """Saves a paper template."""
-    data = request.json
-    try:
-        t_id = db.save_template(
-            data['standard_id'],
-            data['subject_id'],
-            data['name'],
-            data['config_json'],
-            data['total_marks']
-        )
-        return jsonify({"success": True, "id": t_id})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/templates/<int:template_id>', methods=['PUT'])
-def update_template(template_id):
-    """Updates a paper template."""
-    data = request.json
-    try:
-        if db.update_template(
-            template_id,
-            data['name'],
-            data['config_json'],
-            data['total_marks']
-        ):
-            return jsonify({"success": True})
-        return jsonify({"error": "Failed to update template"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/templates/<int:subject_id>', methods=['GET'])
-def get_templates(subject_id):
-    """Returns templates for a subject."""
-    try:
-        templates = db.get_templates(subject_id)
-        return jsonify(templates)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/templates/<int:template_id>', methods=['DELETE'])
-def delete_template(template_id):
-    """Deletes a template."""
-    if db.delete_template(template_id):
-        return jsonify({"success": True})
-    return jsonify({"error": "Failed to delete template"}), 500
-
+# --- CSV Import ---
 @app.route('/api/questions/import', methods=['POST'])
 def import_questions():
-    """Imports questions from a CSV file."""
-    if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-    
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
     file = request.files['file']
     chapter_id = request.form.get('chapter_id')
-    
-    if not file or not chapter_id:
-        return jsonify({"error": "File and chapter_id are required"}), 400
+    if not chapter_id: return jsonify({"error": "chapter_id required"}), 400
 
     try:
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
         reader = csv.DictReader(stream)
+        imported = 0
+        skipped = 0
         
-        imported_count = 0
         for row in reader:
-            if not row.get('content') or not row.get('type_id'):
+            content = row.get('content')
+            if not content:
+                skipped += 1
                 continue
-            db.add_question(
-                chapter_id,
-                int(row['type_id']),
-                row['content'],
-                int(row.get('marks', 1)),
-                row.get('difficulty', 'Medium')
+            
+            # Resolve type_id (either from 'type_id' or 'type_name' column)
+            type_id = row.get('type_id')
+            if not type_id and row.get('type_name'):
+                type_id = db.get_type_id_by_name(row['type_name'])
+            
+            if not type_id:
+                skipped += 1
+                continue
+                
+            res = db.add_question(
+                chapter_id, int(type_id), content,
+                int(row.get('marks', 1)), row.get('difficulty', 'Medium')
             )
-            imported_count += 1
-        return jsonify({"success": True, "count": imported_count})
+            if res: imported += 1
+            else: skipped += 1
+            
+        return jsonify({"success": True, "imported": imported, "skipped": skipped})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/generate', methods=['POST'])
-def generate_paper():
-    """
-    Receives nested sections and blocks, returns generated paper JSON.
-    """
+# --- Templates ---
+@app.route('/api/templates', methods=['POST'])
+def save_template():
     data = request.json
-    sections = data.get('sections')
-    seed = data.get('seed', 42)
-    meta = data.get('meta', {})
+    t_id = db.save_template(
+        data['standard_id'], data['subject_id'], data['name'],
+        data['config_json'], data['total_marks']
+    )
+    return jsonify({"success": True, "id": t_id})
 
-    if not sections:
-        return jsonify({"error": "Missing required parameter: sections"}), 400
+@app.route('/api/templates/<int:std_id>/<int:sub_id>', methods=['GET'])
+def get_templates(std_id, sub_id):
+    return jsonify(db.get_templates_by_std_sub(std_id, sub_id))
 
+@app.route('/api/templates/<int:id>', methods=['DELETE'])
+def delete_template(id):
+    return jsonify({"success": db.delete_template(id)})
+
+# --- Generation & Export ---
+@app.route('/api/generate', methods=['POST'])
+def generate():
+    data = request.json
     try:
-        paper = generator.generate_paper(sections, seed)
-        paper['meta'] = meta
+        paper = generator.generate_paper(data['sections'], data.get('seed', 42))
+        paper['meta'] = data.get('meta', {})
         return jsonify(paper)
     except InsufficientQuestionsError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": e.message}), 400
     except Exception as e:
-        import traceback
-        traceback.print_exc() # This will print the error to the terminal
-        return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/export', methods=['POST'])
-def export_paper():
-    """
-    Receives paper JSON and returns a .docx file.
-    """
+def export():
     data = request.json
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
-
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
             tmp_path = tmp.name
         DocxExporter.generate_docx(data, tmp_path)
-        return send_file(
-            tmp_path,
-            as_attachment=True,
-            download_name='question_paper.docx',
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
+        return send_file(tmp_path, as_attachment=True, download_name='paper.docx')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

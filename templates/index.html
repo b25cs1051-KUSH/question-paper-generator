@@ -42,14 +42,18 @@
         </aside>
 
         <section class="right-panel">
-            <div class="panel-header-actions">
+            <div class="panel-header-actions" style="justify-content: flex-start;">
                 <h2 class="panel-title" style="margin-bottom:0; border:none">Paper Structure</h2>
-                <div class="template-controls">
-                    <select id="template-select">
-                        <option value="">Load Template...</option>
+            </div>
+
+            <!-- NEW TEMPLATE LIBRARY (LOAD AT START) -->
+            <div id="template-library" class="glass" style="margin-bottom: 25px; padding: 15px; border-left: 4px solid var(--accent-yellow);">
+                <label style="font-size: 11px; font-weight: 800; color: var(--accent-yellow); text-transform: uppercase; display: block; margin-bottom: 8px;">Template Library</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="template-select" style="flex-grow: 1; background: #000; border: 1px solid rgba(255,255,255,0.2); padding: 8px; border-radius: 4px; color: white;">
+                        <option value="">Select a template to load...</option>
                     </select>
-                    <button id="del-template-btn" class="mini-del-btn" title="Delete Selected Template">&times;</button>
-                    <button id="save-template-btn" class="secondary-btn" style="padding:4px 12px; font-size:12px">Save As Template</button>
+                    <button id="del-template-btn" class="mini-del-btn" title="Delete Selected Template" style="border: 1px solid #ff4444; color: #ff4444; width: 38px; border-radius: 4px;">&times;</button>
                 </div>
             </div>
             
@@ -79,6 +83,7 @@
                     <div class="generation-settings">
                         <label>Seed:</label>
                         <input type="number" id="paper-seed" value="42" style="width: 70px;">
+                        <button id="save-new-template-btn" class="secondary-btn" style="border-color: var(--accent-green); color: var(--accent-green);">Save as New Template</button>
                         <button id="export-docx-btn" class="secondary-btn">Export to Word (.docx)</button>
                     </div>
                 </div>

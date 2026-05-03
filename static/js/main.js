@@ -6,18 +6,23 @@ let currentSubjectChapters = [];
 let lastGeneratedPaper = null;
 
 // --- Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Paper Generator Initialized');
     
     // Core setup
-    fetchStandards();
-    fetchQuestionTypes();
+    fetchStandards(); // Run immediately
+    setupEventListeners(); // Run immediately
+    addSection(); // Run immediately
 
-    // Global Event Listeners
-    setupEventListeners();
-
-    // Initial default section
-    addSection();
+    // Await non-critical types for dropdowns
+    try {
+        await fetchQuestionTypes();
+        // If we have sections already, refresh their dropdowns
+        document.querySelectorAll('.type-select').forEach(select => {
+            const currentVal = select.value;
+            select.innerHTML = questionTypes.map(t => `<option value="${t.id}" ${t.id == currentVal ? 'selected' : ''}>${t.name}</option>`).join('');
+        });
+    } catch (err) { console.error('Question types failed to load:', err); }
 });
 
 function setupEventListeners() {
@@ -39,9 +44,11 @@ function setupEventListeners() {
     document.getElementById('add-sub-btn').onclick = addSubject;
     document.getElementById('del-sub-btn').onclick = deleteSelectedSubject;
     document.getElementById('add-chapter-btn').onclick = addNewChapter;
-    document.getElementById('save-template-btn').onclick = saveCurrentAsTemplate;
-    document.getElementById('del-template-btn').onclick = deleteSelectedTemplate;
-    document.getElementById('template-select').onchange = loadSelectedTemplate;
+
+    // Template Management
+    document.getElementById('template-select').addEventListener('change', loadSelectedTemplate);
+    document.getElementById('del-template-btn').addEventListener('click', deleteSelectedTemplate);
+    document.getElementById('save-new-template-btn').addEventListener('click', saveTemplateFromPreview);
 }
 
 // --- API Calls ---
@@ -68,7 +75,10 @@ async function fetchStandards() {
             select.appendChild(option);
         });
         
-        if (currentValue) select.value = currentValue;
+        if (currentValue) {
+            select.value = currentValue;
+            fetchSubjects(currentValue); // Trigger the next level on refresh
+        }
 
         select.onchange = (e) => {
             const stdId = e.target.value;
@@ -90,6 +100,8 @@ async function fetchSubjects(standardId) {
         const subjects = await response.json();
         const select = document.getElementById('subject-select');
         
+        const currentValue = select.value;
+        
         select.innerHTML = '<option value="">Select Subject</option>';
         subjects.forEach(sub => {
             const option = document.createElement('option');
@@ -99,6 +111,14 @@ async function fetchSubjects(standardId) {
         });
         
         select.disabled = false;
+        
+        if (currentValue && subjects.some(s => s.id == currentValue)) {
+            select.value = currentValue;
+            fetchChapters(currentValue);
+            fetchTemplates(currentValue); // Important: cascades templates on reload
+            document.getElementById('add-chapter-btn').classList.remove('hidden');
+        }
+        
         select.onchange = (e) => {
             const subId = e.target.value;
             if (subId) {
@@ -172,10 +192,31 @@ function renderSyllabus() {
     });
 }
 
-function updateAllBlockChapters() {
-    document.querySelectorAll('.chapter-selector-mini').forEach(container => {
-        const checkedIds = Array.from(container.querySelectorAll('input:checked')).map(i => i.value);
+function updateAllBlockChapters(specificContainer = null) {
+    const containers = specificContainer ? [specificContainer] : document.querySelectorAll('.chapter-selector-mini');
+    
+    containers.forEach(container => {
+        const checkedIds = Array.from(container.querySelectorAll('input:checked:not(.select-all-toggle)')).map(i => i.value);
         container.innerHTML = generateChaptersHtml(checkedIds);
+        
+        // --- TEMPLATE SYSTEM FIX: SELECT ALL TOGGLE BEHAVIOR ---
+        const toggle = container.querySelector('.select-all-toggle');
+        const normalCheckboxes = container.querySelectorAll('input[type="checkbox"]:not(.select-all-toggle)');
+        
+        if (toggle) {
+            toggle.onchange = (e) => {
+                const checked = e.target.checked;
+                normalCheckboxes.forEach(cb => cb.checked = checked);
+            };
+            
+            // Sync toggle state if individual checkboxes are changed
+            normalCheckboxes.forEach(cb => {
+                cb.onchange = () => {
+                    const allChecked = Array.from(normalCheckboxes).every(c => c.checked);
+                    toggle.checked = allChecked;
+                };
+            });
+        }
     });
 }
 
@@ -183,12 +224,25 @@ function generateChaptersHtml(checkedIds = []) {
     if (currentSubjectChapters.length === 0) {
         return '<p style="font-size: 11px; color: var(--accent-pink)">Add chapters to the syllabus first.</p>';
     }
-    return currentSubjectChapters.map(ch => `
+
+    // --- TEMPLATE SYSTEM FIX: INITIALIZE TOGGLE STATE ---
+    const allChecked = currentSubjectChapters.length > 0 && checkedIds.length === currentSubjectChapters.length;
+
+    const selectAllHtml = `
+        <label class="chapter-option">
+            <input type="checkbox" class="select-all-toggle" ${allChecked ? 'checked' : ''}>
+            <span><b>Select All</b></span>
+        </label>
+    `;
+
+    const chaptersHtml = currentSubjectChapters.map(ch => `
         <label class="chapter-option">
             <input type="checkbox" value="${ch.id}" ${checkedIds.includes(ch.id.toString()) ? 'checked' : ''}>
             <span>${ch.name}</span>
         </label>
     `).join('');
+
+    return selectAllHtml + chaptersHtml;
 }
 
 // --- Workspace Management ---
@@ -251,6 +305,7 @@ function addBlock(container) {
 
     block.querySelector('.remove-block-btn').onclick = () => block.remove();
     container.appendChild(block);
+    updateAllBlockChapters();
 }
 
 function resetWorkspace() {
@@ -272,8 +327,15 @@ async function openQuestionManager(chapter) {
     title.textContent = `MANAGE QUESTIONS: ${chapter.name.toUpperCase()}`;
     
     body.innerHTML = `
-        <div class="add-q-section" style="margin-bottom:25px; padding:20px; background:rgba(255,255,255,0.02); border-radius:8px; border:1px solid var(--accent-green)">
-            <h4 style="margin-bottom:15px; color:var(--accent-green)">ADD NEW QUESTION</h4>
+        <div class="add-q-section glass" style="margin-bottom:25px; padding:20px; border:1px solid var(--accent-green)">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+                <h4 style="color:var(--accent-green); margin:0">ADD NEW QUESTION</h4>
+                <div style="display:flex; gap:10px">
+                    <button id="download-sample-csv" class="secondary-btn" style="font-size:10px; padding:5px 10px; border-color:var(--accent-yellow); color:var(--accent-yellow)">Sample CSV</button>
+                    <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+                    <button id="import-csv-btn" class="secondary-btn" style="font-size:10px; padding:5px 10px; border-color:var(--accent-pink); color:var(--accent-pink)">Bulk Import (CSV)</button>
+                </div>
+            </div>
             <div class="add-q-form">
                 <div class="input-group">
                     <label>Question Content</label>
@@ -318,7 +380,48 @@ async function openQuestionManager(chapter) {
         }
     };
 
+    document.getElementById('import-csv-btn').onclick = () => document.getElementById('csv-file-input').click();
+    document.getElementById('csv-file-input').onchange = (e) => importCSV(e, chapter.id);
+    document.getElementById('download-sample-csv').onclick = downloadSampleCSV;
+
     loadChapterQuestions(chapter.id);
+}
+
+function downloadSampleCSV() {
+    const headers = "content,type_name,marks,difficulty\n";
+    const sampleData = "What is the capital of France?,MCQ,1,Easy\n";
+    const blob = new Blob([headers + sampleData], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample_questions.csv';
+    a.click();
+}
+
+async function importCSV(event, chapterId) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('chapter_id', chapterId);
+
+    try {
+        const response = await fetch('/api/questions/import', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(`Imported ${result.imported} questions. Skipped ${result.skipped}.`);
+            loadChapterQuestions(chapterId);
+        } else {
+            alert(result.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Failed to import CSV.');
+    }
 }
 
 async function loadChapterQuestions(chapterId) {
@@ -495,73 +598,89 @@ async function exportToDocx() {
     } catch (err) { console.error(err); }
 }
 
-// --- Template Management ---
+// --- NEW SCRATCH-BUILT TEMPLATE SYSTEM LOGIC ---
 
-async function saveCurrentAsTemplate() {
+async function fetchTemplates(subjectId) {
+    const stdId = document.getElementById('standard-select').value;
+    if (!stdId || !subjectId) return;
+
+    try {
+        const response = await fetch(`/api/templates/${stdId}/${subjectId}`);
+        const templates = await response.json();
+        const select = document.getElementById('template-select');
+        select.innerHTML = '<option value="">Select a template to load...</option>';
+        templates.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.dataset.config = t.config_json;
+            opt.textContent = `${t.name} (${t.total_marks}M)`;
+            select.appendChild(opt);
+        });
+    } catch (err) { console.error('Error fetching templates:', err); }
+}
+
+async function saveTemplateFromPreview() {
     const stdId = document.getElementById('standard-select').value;
     const subId = document.getElementById('subject-select').value;
-    if (!subId) return alert('Please select a subject first.');
+    if (!subId) return alert('Select subject first.');
 
-    const templateSelect = document.getElementById('template-select');
-    const selectedTemplateId = templateSelect.value;
-    const selectedTemplateName = selectedTemplateId ? templateSelect.selectedOptions[0].textContent.split(' (')[0] : "";
-
-    let name = prompt("Enter Template Name:", selectedTemplateName || "New Template");
+    const name = prompt("Enter a name for this new template:", "My Custom Template");
     if (!name) return;
 
-    const sections = getPaperStructure();
-    const totalMarks = calculateTotalMarks({ sections: Object.fromEntries(sections.map(s => [s.name, s])) });
+    // --- TEMPLATE SYSTEM FIX: DO NOT STORE CHAPTERS ---
+    const rawSections = getPaperStructure();
+    const cleanSections = rawSections.map(s => ({
+        name: s.name,
+        blocks: s.blocks.map(b => ({
+            type_id: b.type_id,
+            count: b.count,
+            marks: b.marks
+        }))
+    }));
 
-    let response;
-    if (selectedTemplateId && name === selectedTemplateName) {
-        if (!confirm(`Update existing template '${name}'?`)) return;
-        response = await fetch(`/api/templates/${selectedTemplateId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: name,
-                config_json: JSON.stringify(sections),
-                total_marks: totalMarks
-            })
-        });
-    } else {
-        response = await fetch('/api/templates', {
+    const totalMarks = calculateTotalMarks({ sections: Object.fromEntries(cleanSections.map(s => [s.name, s])) });
+
+    try {
+        const response = await fetch('/api/templates', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 standard_id: stdId,
                 subject_id: subId,
                 name: name,
-                config_json: JSON.stringify(sections),
+                config_json: JSON.stringify(cleanSections),
                 total_marks: totalMarks
             })
         });
-    }
 
-    if (response.ok) {
-        alert('Template saved successfully!');
-        fetchTemplates(subId);
-    }
+        if (response.ok) {
+            alert('Template saved successfully to the library!');
+            fetchTemplates(subId);
+        } else {
+            alert('Failed to save template.');
+        }
+    } catch (err) { console.error(err); }
 }
 
 async function deleteSelectedTemplate() {
     const id = document.getElementById('template-select').value;
     if (!id) return alert('Select a template to delete.');
-    if (!confirm('Are you sure you want to delete this template permanently?')) return;
+    if (!confirm('Permanently delete this template?')) return;
 
-    const response = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
-    if (response.ok) {
-        alert('Template deleted.');
-        const subId = document.getElementById('subject-select').value;
-        fetchTemplates(subId);
-    }
+    try {
+        const response = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            alert('Template deleted.');
+            fetchTemplates(document.getElementById('subject-select').value);
+        }
+    } catch (err) { console.error(err); }
 }
 
 function loadSelectedTemplate(e) {
     const opt = e.target.selectedOptions[0];
     if (!opt || !opt.dataset.config) return;
 
-    if (!confirm('This will replace your current structure. Continue?')) return;
+    if (!confirm('This will clear your current structure. Load this template?')) return;
 
     const sections = JSON.parse(opt.dataset.config);
     const container = document.getElementById('sections-container');
@@ -572,7 +691,7 @@ function loadSelectedTemplate(e) {
         addSection(sectionChar);
         const lastSection = container.lastElementChild;
         const blocksContainer = lastSection.querySelector('.blocks-container');
-        blocksContainer.innerHTML = '';
+        blocksContainer.innerHTML = ''; // Clear the default block added by addSection
 
         s.blocks.forEach(b => {
             addBlock(blocksContainer);
@@ -580,9 +699,9 @@ function loadSelectedTemplate(e) {
             lastBlock.querySelector('.type-select').value = b.type_id;
             lastBlock.querySelector('.count-input').value = b.count;
             lastBlock.querySelector('.marks-input').value = b.marks;
-            lastBlock.querySelectorAll('.chapter-option input').forEach(cb => {
-                cb.checked = b.chapters.includes(parseInt(cb.value));
-            });
+            
+            // Sync the Select All UI for this block
+            updateAllBlockChapters(lastBlock.querySelector('.chapter-selector-mini'));
         });
     });
 }
