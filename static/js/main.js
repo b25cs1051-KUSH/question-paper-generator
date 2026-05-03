@@ -638,7 +638,12 @@ async function saveTemplateFromPreview() {
         }))
     }));
 
-    const totalMarks = calculateTotalMarks({ sections: Object.fromEntries(cleanSections.map(s => [s.name, s])) });
+    let totalMarks = 0;
+    cleanSections.forEach(s => {
+        s.blocks.forEach(b => {
+            totalMarks += b.count * b.marks;
+        });
+    });
 
     try {
         const response = await fetch('/api/templates', {
