@@ -509,7 +509,7 @@ async function generatePaper() {
 function getPaperStructure() {
     return Array.from(document.querySelectorAll('.section-wrapper')).map(sw => {
         const blocks = Array.from(sw.querySelectorAll('.rule-block')).map(rb => {
-            const selectedCh = Array.from(rb.querySelectorAll('.chapter-option input:checked')).map(i => parseInt(i.value));
+            const selectedCh = Array.from(rb.querySelectorAll('.chapter-option input:checked:not(.select-all-toggle)')).map(i => parseInt(i.value)); 
             return {
                 type_id: parseInt(rb.querySelector('.type-select').value),
                 chapters: selectedCh,

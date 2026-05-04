@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS questions (
     marks INTEGER NOT NULL,
     difficulty TEXT CHECK(difficulty IN ('Easy', 'Medium', 'Hard')) DEFAULT 'Medium',
     content_hash TEXT UNIQUE NOT NULL, -- To prevent duplicate questions
+    
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
     FOREIGN KEY (type_id) REFERENCES question_types(id) ON DELETE CASCADE
 );

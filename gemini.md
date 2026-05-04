@@ -14,7 +14,7 @@ Expert Senior Python Architect & Full-Stack Developer.
 1.  **Database Layer (`database/`):**
     - `schema.sql`: Hierarchical structure (Standards > Subjects > Chapters > Questions).
     - `db_manager.py`: Handles all CRUD, nested question availability checks, and template persistence.
-    - `seeder.py`: Seeds 600 sample questions (Std 8-12) for instant testing.
+    - `seeder.py`: Seeds 6000 sample questions across all subjects for rigorous testing.
 2.  **Generation Engine (`services/`):**
     - `generator_service.py`: 
         - Features a **Robust Weightage Engine** that pools questions from selected chapters and handles "Equal Distribution" even if some chapters are empty.
@@ -29,7 +29,7 @@ Expert Senior Python Architect & Full-Stack Developer.
     - **Template System:** Save and load full paper structures (Sections, Blocks, Chapters).
 
 # Operational Guide
-- **Initial Setup:** `python -m database.seeder` (Adds 600 questions).
+- **Initial Setup:** `python -m database.seeder` (Adds 6000 questions).
 - **Run Server:** `python app.py` (Runs on `http://127.0.0.1:5000`).
 - **Update Database:** Use `python scripts/update_db.py` for schema migrations.
 - **Bulk Import:** Use the "Download Sample CSV" link in the UI to see the required format.
