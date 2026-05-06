@@ -4,10 +4,23 @@ import tempfile
 import csv
 import io
 import traceback
+import sys
+import webbrowser
+from threading import Timer
 from database.db_manager import DatabaseManager
 from services.generator_service import PaperGenerator, InsufficientQuestionsError, DocxExporter
 
-app = Flask(__name__)
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), relative_path)
+
+# Initialize Flask with explicit paths for PyInstaller
+app = Flask(__name__, 
+            template_folder=get_resource_path('templates'),
+            static_folder=get_resource_path('static'))
+
 db = DatabaseManager()
 generator = PaperGenerator()
 
@@ -73,6 +86,14 @@ def delete_chapter(id):
 def get_question_types():
     return jsonify(db.get_question_types())
 
+@app.route('/api/question_types', methods=['POST'])
+def add_question_type():
+    data = request.json
+    name = data.get('name')
+    if not name: return jsonify({"error": "Name is required"}), 400
+    res = db.add_question_type(name)
+    return jsonify({"success": True, "id": res}) if res else jsonify({"error": "Failed or Duplicate"}), 400
+
 # --- Questions ---
 @app.route('/api/questions/chapter/<int:chapter_id>', methods=['GET'])
 def get_chapter_questions(chapter_id):
@@ -82,12 +103,31 @@ def get_chapter_questions(chapter_id):
 def add_question():
     data = request.json
     try:
+        # Support add-on-the-fly for new types
+        type_id = data.get('type_id')
+        type_name = data.get('type_name')
+        
+        if not type_id and type_name:
+            type_id = db.get_or_create_type_id(type_name)
+            
+        if not type_id:
+            return jsonify({"error": "Question Type is required"}), 400
+
         q_id = db.add_question(
-            data['chapter_id'], data['type_id'], data['content'],
+            data['chapter_id'], type_id, data['content'],
             data['marks'], data.get('difficulty', 'Medium')
         )
-        return jsonify({"success": True, "id": q_id}) if q_id else jsonify({"error": "Duplicate"}), 400
+        if q_id:
+            return jsonify({"success": True, "id": q_id})
+        else:
+            # Check if it was a duplicate or invalid type
+            types = db.get_question_types()
+            type_exists = any(t['id'] == int(type_id) for t in types)
+            if not type_exists:
+                return jsonify({"error": "Invalid Question Type"}), 400
+            return jsonify({"error": "Duplicate question content in this database."}), 400
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/questions/<int:id>', methods=['DELETE'])
@@ -114,24 +154,35 @@ def import_questions():
                 skipped += 1
                 continue
             
-            # Resolve type_id (either from 'type_id' or 'type_name' column)
+            # Resolve type_id
             type_id = row.get('type_id')
-            if not type_id and row.get('type_name'):
-                type_id = db.get_type_id_by_name(row['type_name'])
+            type_name = row.get('type_name')
+            
+            # If type_id is provided but isn't numeric, treat it as a name
+            if type_id and not str(type_id).isdigit():
+                type_name = type_id
+                type_id = None
+                
+            if not type_id and type_name:
+                type_id = db.get_or_create_type_id(type_name)
             
             if not type_id:
                 skipped += 1
                 continue
                 
-            res = db.add_question(
-                chapter_id, int(type_id), content,
-                int(row.get('marks', 1)), row.get('difficulty', 'Medium')
-            )
-            if res: imported += 1
-            else: skipped += 1
+            try:
+                res = db.add_question(
+                    chapter_id, int(type_id), content,
+                    int(row.get('marks', 1)), row.get('difficulty', 'Medium')
+                )
+                if res: imported += 1
+                else: skipped += 1
+            except:
+                skipped += 1
             
         return jsonify({"success": True, "imported": imported, "skipped": skipped})
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 # --- Templates ---
@@ -177,5 +228,14 @@ def export():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def open_browser():
+    """Opens the default web browser to the application URL."""
+    webbrowser.open_new('http://127.0.0.1:5000/')
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Automatically open browser after 1 second
+    if not os.environ.get("WERKZEUG_RUN_MAIN"): # Prevent opening twice in dev mode
+        Timer(1, open_browser).start()
+        
+    # Disable debug mode for PyInstaller compatibility
+    app.run(host='127.0.0.1', port=5000, debug=False)

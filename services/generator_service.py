@@ -77,7 +77,13 @@ class PaperGenerator:
                     try:
                         cursor = conn.execute("SELECT * FROM questions WHERE chapter_id = ? AND type_id = ?", (ch_id, type_id))
                         all_qs = [dict(row) for row in cursor.fetchall()]
-                        block_questions.extend(random.sample(all_qs, count_for_this_chapter))
+                        selected_qs = random.sample(all_qs, count_for_this_chapter)
+                        
+                        # Override individual question marks with the rule-defined marks
+                        for q in selected_qs:
+                            q['marks'] = block['marks'] 
+                            
+                        block_questions.extend(selected_qs)
                     finally:
                         conn.close()
 
@@ -127,9 +133,13 @@ class DocxExporter:
                 r.bold = True
                 
                 for q in block['questions']:
+                    # Handle multi-line content by splitting into paragraphs or preserving breaks
+                    q_text = f"Q{q_num}. {q['content']}"
                     q_p = doc.add_paragraph()
-                    q_p.add_run(f"Q{q_num}. {q['content']}").font.size = Pt(11)
-                    q_p.add_run(f"\t[{q['marks']}M]").bold = True
+                    q_p.add_run(q_text).font.size = Pt(11)
+                    
+                    # Align marks to the right or just append them
+                    q_p.add_run(f"\t[{block['rule']['marks']}M]").bold = True
                     q_num += 1
                     
         doc.save(output_path)

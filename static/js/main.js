@@ -17,13 +17,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Await non-critical types for dropdowns
     try {
         await fetchQuestionTypes();
-        // If we have sections already, refresh their dropdowns
-        document.querySelectorAll('.type-select').forEach(select => {
-            const currentVal = select.value;
-            select.innerHTML = questionTypes.map(t => `<option value="${t.id}" ${t.id == currentVal ? 'selected' : ''}>${t.name}</option>`).join('');
-        });
+        refreshAllTypeSelects();
     } catch (err) { console.error('Question types failed to load:', err); }
 });
+
+function refreshAllTypeSelects() {
+    document.querySelectorAll('.type-select, #new-q-type').forEach(select => {
+        const currentVal = select.value;
+        select.innerHTML = questionTypes.map(t => `<option value="${t.id}" ${t.id == currentVal ? 'selected' : ''}>${t.name}</option>`).join('');
+    });
+}
 
 function setupEventListeners() {
     // Buttons
@@ -336,22 +339,28 @@ async function openQuestionManager(chapter) {
                     <button id="import-csv-btn" class="secondary-btn" style="font-size:10px; padding:5px 10px; border-color:var(--accent-pink); color:var(--accent-pink)">Bulk Import (CSV)</button>
                 </div>
             </div>
+            <p style="font-size:11px; color:var(--text-secondary); margin-bottom:15px">Tip: For paragraph questions, just type the text and questions with line breaks. They will be preserved.</p>
             <div class="add-q-form">
                 <div class="input-group">
                     <label>Question Content</label>
-                    <textarea id="new-q-content" placeholder="Type question here..."></textarea>
+                    <textarea id="new-q-content" placeholder="Type question here... (Supports multi-line)" style="min-height:100px; white-space: pre-wrap;"></textarea>
                 </div>
-                <div class="input-group">
-                    <label>Type</label>
-                    <select id="new-q-type">
-                        ${questionTypes.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
-                    </select>
+                <div style="display:grid; grid-template-columns: 1fr 100px; gap:20px">
+                    <div class="input-group">
+                        <label>Type <span style="font-size:9px; color:var(--accent-yellow); font-weight:normal">(Select existing or type new)</span></label>
+                        <div class="custom-combobox" style="position:relative">
+                            <input type="text" id="new-q-type-input" list="q-types-list" placeholder="Select or type..." style="width:100%">
+                            <datalist id="q-types-list">
+                                ${questionTypes.map(t => `<option value="${t.name}" data-id="${t.id}">`).join('')}
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>Marks</label>
+                        <input type="number" id="new-q-marks" value="1">
+                    </div>
                 </div>
-                <div class="input-group">
-                    <label>Marks</label>
-                    <input type="number" id="new-q-marks" value="1" style="width:60px">
-                </div>
-                <button id="save-q-btn" class="primary-btn" style="background:var(--accent-green); color:black; height:42px">SAVE</button>
+                <button id="save-q-btn" class="primary-btn" style="background:var(--accent-green); color:black; height:42px; margin-top:15px">SAVE QUESTION</button>
             </div>
         </div>
         <div id="chapter-q-list" class="q-list-container">Loading questions...</div>
@@ -361,18 +370,36 @@ async function openQuestionManager(chapter) {
 
     document.getElementById('save-q-btn').onclick = async () => {
         const content = document.getElementById('new-q-content').value.trim();
-        const type_id = document.getElementById('new-q-type').value;
+        const type_name = document.getElementById('new-q-type-input').value.trim();
         const marks = document.getElementById('new-q-marks').value;
+        
         if (!content) return alert('Question content cannot be empty.');
+        if (!type_name) return alert('Please select or type a question type.');
+
+        // Find if type already exists
+        let type_id = questionTypes.find(t => t.name.toLowerCase() === type_name.toLowerCase())?.id;
 
         const response = await fetch('/api/questions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chapter_id: chapter.id, type_id, content, marks })
+            body: JSON.stringify({ 
+                chapter_id: chapter.id, 
+                type_id: type_id, 
+                type_name: type_id ? null : type_name, // Send name if ID is missing
+                content, 
+                marks 
+            })
         });
 
         if (response.ok) {
             document.getElementById('new-q-content').value = '';
+            document.getElementById('new-q-type-input').value = '';
+            await fetchQuestionTypes(); // Refresh global types
+            refreshAllTypeSelects(); // Update all dropdowns
+            
+            // Re-render the datalist in the current modal
+            document.getElementById('q-types-list').innerHTML = questionTypes.map(t => `<option value="${t.name}" data-id="${t.id}">`).join('');
+            
             loadChapterQuestions(chapter.id);
         } else {
             const err = await response.json();
@@ -414,6 +441,8 @@ async function importCSV(event, chapterId) {
         const result = await response.json();
         if (response.ok) {
             alert(`Imported ${result.imported} questions. Skipped ${result.skipped}.`);
+            await fetchQuestionTypes(); // Refresh types in case new ones were added during import
+            refreshAllTypeSelects();
             loadChapterQuestions(chapterId);
         } else {
             alert(result.error);
@@ -559,7 +588,20 @@ function displayPaper(paper) {
                 qDiv.style.display = 'flex';
                 qDiv.style.justifyContent = 'space-between';
                 qDiv.style.marginBottom = '10px';
-                qDiv.innerHTML = `<div style="max-width:90%">Q${qCounter}. ${q.content}</div><div style="font-weight:800">[${q.marks}]</div>`;
+                
+                // --- MULTI-LINE FIX: Use white-space: pre-wrap and innerText/textContent ---
+                const qText = document.createElement('div');
+                qText.style.maxWidth = '90%';
+                qText.style.whiteSpace = 'pre-wrap'; // Preserve newlines
+                qText.textContent = `Q${qCounter}. ${q.content}`;
+                
+                const qMarks = document.createElement('div');
+                qMarks.style.fontWeight = '800';
+                qMarks.textContent = `[${block.rule.marks}]`; // Use marks from template override
+                
+                qDiv.appendChild(qText);
+                qDiv.appendChild(qMarks);
+                
                 sectionDiv.appendChild(qDiv);
                 qCounter++;
             });
